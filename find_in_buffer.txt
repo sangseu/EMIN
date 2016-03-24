@@ -1,0 +1,362 @@
+/*
+ * atmega32_mini.c
+ *
+ * Created: 5/9/2015 12:57:12 PM
+ *  Author: MiG-0
+ */ 
+
+#define F_CPU 1000000UL
+
+#define D4 eS_PORTB0
+#define D5 eS_PORTB1
+#define D6 eS_PORTB2
+#define D7 eS_PORTB3
+#define RS eS_PORTD6
+#define EN eS_PORTD7
+
+#define AT "AT\r\n"
+#define MODE3 "AT+CWMODE=3\r\n"
+#define CWJAP "AT+CWJAP="
+#define ROUTER "AT+CWJAP=\"khong co pass\",\"passlaanhcaonhe!\"\r\n"
+#define name "khong co pass"
+#define pass "passlaanhcaonhe!"
+#define MUX "AT+CIPMUX=1\r\n"
+#define SERVER "AT+CIPSTART=1,\"TCP\",\"192.168.0.107\",2103\r\n"
+
+
+
+
+#include <avr/io.h>
+#include <util/delay.h>
+
+#include "diskio.h"
+#include "pff.h"
+#include "lcd.h"
+#include "miguart.h"
+#include <stdio.h>
+#include <string.h>
+#include <avr/interrupt.h>
+#include <avr/io.h>
+
+
+
+/*
+#define KLAW_G (1<<PC1)
+#define KLAW_D (1<<PC0)
+*/
+
+char byte2bcd(char chr);
+
+int dem=0;
+char bf[100];
+int find(char *a,int n);
+FILE outlcd = FDEV_SETUP_STREAM(Lcd4_Write_Char,NULL,_FDEV_SETUP_WRITE);
+FILE outuart = FDEV_SETUP_STREAM(USARTWriteChar,NULL,_FDEV_SETUP_WRITE);
+//unsigned char c = 0x00;
+unsigned char a,b,c;
+
+int main(void)
+{
+	DDRA = 0xFF;
+	DDRB = 0x0F;
+	DDRC = 0xFF;
+	DDRD = 0xF0;
+	
+	
+	//BYTE res;
+	FRESULT res;
+	WORD br;
+	FATFS fs, fo;			// File system object
+	
+	BYTE buffer[1024];
+	//uint16_t offset=0;
+	
+	sei();
+	
+	//stdout= &outlcd;
+	//stdout= &outuart;
+	
+	
+	Lcd4_Init();
+	_delay_ms(2);
+	Lcd4_Clear();
+	
+	//uart_init(4800, 1, 8, 1, 1);
+	//USART_Init();
+	USART_Init2(); // x2, 9600,8bit, 1 stopbit, no parity, 1Mhz
+
+
+	Lcd4_Write_String("Init...");
+	_delay_ms(2);
+	
+	/*
+	//++++++++++++++++++++++++++++++ mount
+	res=pf_mount(&fs);
+	
+	Lcd4_Clear();
+
+	if(res==FR_OK)
+	Lcd4_Write_String("FR_OK");
+	else if(res==FR_NOT_READY)
+	Lcd4_Write_String("FR_NOT_READY");
+	else if(res==FR_DISK_ERR)
+	Lcd4_Write_String("FR_DISK_ERR");
+	else if(res==FR_NO_FILESYSTEM)
+	Lcd4_Write_String("FR_NO_FILESYSTEM");
+	//+++++++++++++++++++++++++++++++++++++
+	
+	//+++++++++++++++++++++++++++++++++++++ open file on "IMG" folder
+	res = pf_open("IMG/white.png");
+	if (res) return(int)res;
+	else
+	{
+		Lcd4_Clear();
+		Lcd4_Write_String("Open file_OK");
+		_delay_ms(150);
+	}
+	
+	//++++++++++++++++ read to send
+	Lcd4_Clear();
+	Lcd4_Write_String("Reading");
+	for (;;)
+	{
+		res = pf_read(&fo, sizeof buffer, &br);  // Read a chunk of source file
+		if (res || br == 0) break; // break error or eof ->> can sua neu EOF->>send 1 ki tu dac biet
+		
+		//++++++++++++++++++ convert to send
+		char conhex[(sizeof buffer)*2];
+		for (int i=0; i< (sizeof buffer); i++)
+		{
+			a=buffer[i];
+			//Tach 4 bit dau vao bien b, va giu lai 4 bit cuoi cua a
+			b = (a & 0xf0) >> 4;
+			a = (a & 0x0f);
+			//chuyen b,a thanh ki tu hexa tuong ung
+			b = byte2bcd(b);
+			a = byte2bcd(a);
+			
+			conhex[i*2] = b;
+			conhex[i*2 + 1] = a;
+			
+			//test+++++++
+			stdout= &outuart;
+			printf("%c%c",b,a);
+			//Lcd4_Write_Char(b);
+			//Lcd4_Write_Char(a);
+			
+			
+			
+			a = b = 0x00; //+++++++ xoa bo nho tam
+			//+++++++++++++++++ return conhex[], do lon = bufferx2
+			
+		}
+		//+++++++++++++++++
+		
+	} 
+	
+	//+++++++++++++++++++++++++++++++++++++++++++++++
+	while(1);
+	*/
+
+	Lcd4_Set_Cursor(1,0);
+	Lcd4_Write_String("Call wifi module");
+	
+	
+	
+	_delay_ms(50);
+	connect();
+	
+	//sprintf (sf, "%d", 256);
+	//yeu cau gui
+	connect_tosend("5");
+	printf("start\r\n");
+	stdout= &outlcd;
+	while (find("sok",3)==0)
+	{
+		Lcd4_Clear();
+		printf("...");
+	}
+	printf("start OK");
+	
+	
+	
+	stdout= &outuart;
+	connect_tosend("120");
+	printf("89504E470D0A1A0A0000000D49484452000000010000000108060000001F15C489000000017352474200AECE1CE90000000467414D410000B18F0BFC");
+
+	
+	while (find("pok",3)==0)
+	{
+		Lcd4_Clear();
+		printf("...");
+	}
+	dem =0;
+	stdout= &outlcd;
+	printf("pok OK");
+	_delay_ms(500);
+	
+	
+	stdout= &outuart;
+	connect_tosend("120");
+	printf("6105000000097048597300000EC400000EC401952B0E1B0000000D49444154185763606060F80F00010401007020650B0000000049454E44AE426082");
+	
+	
+	//ket thuc gui
+	_delay_ms(500);
+	stdout= &outuart;
+	connect_tosend("3");
+	printf("end\r\n");
+	stdout= &outlcd;
+	while (find("eok",3)==0)
+	{
+		Lcd4_Clear();
+		printf("...");
+	}
+	printf("end_save OK");
+	
+}
+int find(char *a,int n)
+{
+	int i,j;
+	int kt=0;
+	for (i=0;i<dem;i++)
+	{
+		kt=1;
+		for (j=0;j<n;j++)
+		if (bf[i+j]!=a[j]) kt=0;
+		if (kt==1) return 1;
+	}
+	return 0;
+}
+ISR( USART_RXC_vect )
+{
+	char udata;
+	udata=UDR;
+	bf[dem]=udata;
+	dem++;
+	if (dem==99)
+	dem=0;
+}
+
+void connect()
+{
+	dem =0;
+	stdout= &outuart;
+	printf(AT);
+	_delay_ms(200);
+	while (find("OK",2)==0);
+	dem =0;
+	stdout= &outlcd;
+	Lcd4_Clear();
+	printf("wifi OK");
+	/*
+	stdout= &outuart;
+	printf(MODE3);
+	_delay_ms(50);
+	while (find("OK",2)==0);
+	dem =0;
+	stdout= &outlcd;
+	Lcd4_Clear();
+	printf("Client-Server");
+	*/
+	
+	stdout= &outuart;
+	/*
+	printf("AT+CWJAP=");
+	printf("\"");
+	printf("%s",name);
+	printf("\"");
+	printf(",");
+	printf("\"");
+	printf("%s",pass);
+	printf("\"");
+	printf("\r\n");
+	*/
+	printf(ROUTER);
+	_delay_ms(500);
+	
+
+	stdout= &outlcd;
+	Lcd4_Clear();
+	printf(bf);
+	_delay_ms(50);
+	while (find("OK",2) == 0)
+	{
+		Lcd4_Clear();
+		printf("...");
+	}
+	printf("Router OK");
+	dem =0;
+	_delay_ms(50);
+	
+	stdout= &outuart;
+	printf(MUX);
+	printf("\r\n");
+	_delay_ms(50);
+	while (find("OK",2)==0);
+	dem =0;
+	stdout= &outlcd;
+	Lcd4_Clear();
+	printf("MUX=1");
+	
+	stdout= &outuart;
+	printf(SERVER);
+	stdout= &outlcd;
+	Lcd4_Clear();
+	while (find("OK",2)==0)
+	{
+		printf("...");
+		Lcd4_Clear();
+	}
+	dem =0;
+	Lcd4_Clear();
+	printf("Server OK");
+	_delay_ms(50);
+	
+}
+
+void connect_tosend(const char * len)
+{
+	dem =0;
+	stdout= &outuart;
+	printf("AT+CIPSEND=1,%s\r\n",len);
+	//_delay_ms(200);
+	stdout= &outlcd;
+	while (find("OK",2)==0)
+	{
+		printf("...");
+		Lcd4_Clear();
+	}
+	printf("Ready");
+	stdout= &outuart;
+	
+}
+
+char byte2bcd(char chr)
+{
+	switch(chr)
+	{
+		case 0x00: return '0';
+		case 0x01: return '1';
+		case 0x02: return '2';
+		case 0x03: return '3';
+		case 0x04: return '4';
+		case 0x05: return '5';
+		case 0x06: return '6';
+		case 0x07: return '7';
+		case 0x08: return '8';
+		case 0x09: return '9';
+		case 0x0A: return 'A';
+		case 0x0B: return 'B';
+		case 0x0C: return 'C';
+		case 0x0D: return 'D';
+		case 0x0E: return 'E';
+		case 0x0F: return 'F';
+	}
+}
+/*
+char byte2char(unsigned char chr)
+{
+	return (char) chr;
+}
+*/
