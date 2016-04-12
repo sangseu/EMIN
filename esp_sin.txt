@@ -1,0 +1,246 @@
+
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+#include <string.h>
+
+#include <ArduinoJson.h>
+
+// Update these with values suitable for your network.
+const char* ssid = "Emin T5";
+const char* password = "1133557799";
+
+String s_mqtt_server = "";
+const char* mqtt_server;
+//const char* mqtt_server = "192.168.76.110";
+#define topic_pub "sensor/"
+// ==================================================
+bool connected_broker = false;
+
+const int max_buff = 128;
+char buff[max_buff];
+String s_buff = "";
+int buff_index = 0;
+bool have_frame = false;
+char* sensor[3];
+
+String ID = getID();
+char* c_ID = &ID[0]; //  need String->char* : Fix ID:null
+
+long lastMsg = 0;
+char msg[50];
+long f_pub = 1000; // frequen PUBLISH
+
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+StaticJsonBuffer<225> jsonBuffer;
+JsonObject& root = jsonBuffer.createObject();
+JsonObject& value = jsonBuffer.createObject();
+
+void setup_wifi() {
+
+  delay(10);
+  // We start by connecting to a WiFi network
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+
+  // Switch on the LED if an 1 was received as first character
+  if ((char)payload[0] == '1') {
+    digitalWrite(BUILTIN_LED, LOW);   // Turn the LED on (Note that LOW is the voltage level
+    // but actually the LED is on; this is because
+    // it is acive low on the ESP-01)
+  } else {
+    digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
+  }
+
+}
+
+void reconnect() {
+
+  // Loop until we're reconnected
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    // Attempt to connect
+    if (client.connect(c_ID)) {
+      Serial.println("connected");
+      // Once connected, publish an announcement...
+      client.publish("sensor/", "ESP_Reconnect");
+      // ... and resubscribe
+      client.subscribe("sensor/ctrl");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  setup_wifi();
+
+
+  Serial.println("[Insert Broker's IP]: ");
+  while (!Serial.available());
+  s_mqtt_server = Serial.readStringUntil('\n');
+  mqtt_server = &s_mqtt_server[0];
+  Serial.println(mqtt_server);
+
+
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
+
+}
+
+void loop() {
+
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+
+  while (Serial.available())
+  {
+    //buff[buff_index++] = (char)Serial.read();
+    s_buff = Serial.readString();
+    have_frame = true;
+
+
+    s_buff = "";
+  }
+
+  if (have_frame)
+  {
+    s_buff[s_buff.length() - 1] = '\0'; // remove '@'-end of frame
+
+    int x, y = 0;
+    Serial.println(s_buff);
+    have_frame = false;
+
+    char *p = &s_buff[0];
+    char *str;
+    while ((str = strtok_r(p, "#", &p)) != NULL) // delimiter is the semicolon
+    {
+      Serial.println("[split]");
+      Serial.print('\t');
+      Serial.println(str);
+
+      char *str2;
+      while ((str2 = strtok_r(str, ":", &str)) != NULL) // delimiter is the semicolon
+      {
+        Serial.println("[split2]");
+        Serial.print('\t');
+        Serial.println(str2);
+
+        sensor[x] = str2;
+        Serial.println("x" + String(x));
+        Serial.println("y" + String(y));
+        Serial.print("sensor "); Serial.println(sensor[x]);
+        x++;
+      }
+      value[sensor[0]] = sensor[1];
+
+      x = 0;
+      y++;
+    }
+    s_buff = "";
+
+    root["ID"] = c_ID;
+    root["time"] = "10:28:08-07:04:2016";
+    root["value"] = value;
+    String json;
+    root.printTo(json);
+    char* c_json = &json[0];
+    Serial.print(c_json);
+    client.publish(topic_pub, c_json);
+  } //  end if
+
+  //=============================================test
+  else {
+    long now = millis();
+    if (now - lastMsg > f_pub) {
+      lastMsg = now;
+
+      root["id"] = c_ID;
+
+
+      
+      root["time"] = lastMsg / f_pub;
+      double v_sin1 = 3 * sin(2 * 3.14 * 50 * (lastMsg / f_pub) + 0);
+      double v_sin2 = 3 * sin(2 * 3.14 * 50 * (lastMsg / f_pub) + 3.14 / 3.0);
+      double v_sin3 = 3 * sin(2 * 3.14 * 50 * (lastMsg / f_pub) + 2 * 3.14 / 3.0);
+      value["temp"] = v_sin1;
+      value["hum"] = v_sin2;
+      value["lux"] = v_sin3;
+
+      /*
+      String s_time = String(lastMsg / f_pub);
+      char* c_time = &s_time[0];
+      root["time"] = c_time;
+      String v_sin1 = String((double) 3 * sin(2 * 3.14 * 50 * (lastMsg / f_pub) + 0));
+      String v_sin2 = String((double) 3 * sin(2 * 3.14 * 50 * (lastMsg / f_pub) + 3.14 / 3.0));
+      String v_sin3 = String((double) 3 * sin(2 * 3.14 * 50 * (lastMsg / f_pub) + 2 * 3.14 / 3.0));
+      char* c_sin1 = &v_sin1[0];
+      char* c_sin2 = &v_sin3[0];
+      char* c_sin3 = &v_sin3[0];
+      value["temp"] = c_sin1;
+      value["hum"] = c_sin2;
+      value["lux"] = c_sin3;
+      */
+      
+
+      root["value"] = value;
+
+      String json;
+      root.printTo(json);
+      char* c_json = &json[0];
+      Serial.println(c_json);
+
+      String s_sin = (String)v_sin1;
+      char* c_sin = &s_sin[0];
+
+      client.publish(topic_pub, c_json);
+      client.publish("sensor/sin", c_sin);
+
+    }
+  }
+  //=============================================test
+
+}
+
+String getID() {
+  uint8_t mac[] = {0, 0, 0, 0, 0, 0};
+  String s;
+  WiFi.macAddress(mac); // 18fe34a34630
+  for (int i = 0; i < sizeof(mac); ++i) {
+    s += String(mac[i], HEX);
+  }
+  return s;
+}
+
